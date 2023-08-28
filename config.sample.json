@@ -19,5 +19,11 @@
   },
   "use_tls": false,
   "tls_cert_file": "",
-  "tls_key_file": ""
+  "tls_key_file": "",
+  "nsq": {
+    "nsqlookupd_addresses": [],
+    "nsqd_addresses": [],
+    "topic": "",
+    "channel": ""
+  }
 }

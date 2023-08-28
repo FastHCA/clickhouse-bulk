@@ -85,7 +85,7 @@ func (t *Table) Flush() {
 		Query:    t.Query,
 		Content:  t.Content(),
 		Count:    len(t.Rows),
-		isInsert: true,
+		IsInsert: true,
 	}
 	t.Sender.Send(&req)
 	t.Rows = make([]string, 0, t.FlushCount)

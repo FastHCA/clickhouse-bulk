@@ -10,8 +10,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/nikepan/go-datastructures/queue"
 )
 
 // ClickhouseServer - clickhouse server instance object struct
@@ -26,22 +24,13 @@ type ClickhouseServer struct {
 // Clickhouse - main clickhouse sender object
 type Clickhouse struct {
 	Servers        []*ClickhouseServer
-	Queue          *queue.Queue
+	Queue          *Queue
 	mu             sync.Mutex
 	DownTimeout    int
 	ConnectTimeout int
 	Dumper         Dumper
 	wg             sync.WaitGroup
 	Transport      *http.Transport
-}
-
-// ClickhouseRequest - request struct for queue
-type ClickhouseRequest struct {
-	Params   string
-	Query    string
-	Content  string
-	Count    int
-	isInsert bool
 }
 
 // ErrServerIsDown - signals about server is down
@@ -51,7 +40,7 @@ var ErrServerIsDown = errors.New("server is down")
 var ErrNoServers = errors.New("No working clickhouse servers")
 
 // NewClickhouse - get clickhouse object
-func NewClickhouse(downTimeout int, connectTimeout int, tlsServerName string, tlsSkipVerify bool) (c *Clickhouse) {
+func NewClickhouse(downTimeout int, connectTimeout int, tlsServerName string, tlsSkipVerify bool, opts ...ClickhouseOption) (c *Clickhouse) {
 	tlsConfig := &tls.Config{}
 	if tlsServerName != "" {
 		tlsConfig.ServerName = tlsServerName
@@ -67,10 +56,16 @@ func NewClickhouse(downTimeout int, connectTimeout int, tlsServerName string, tl
 		c.ConnectTimeout = 10
 	}
 	c.Servers = make([]*ClickhouseServer, 0)
-	c.Queue = queue.New(1000)
+	c.Queue = NewQueue(1000)
 	c.Transport = &http.Transport{
 		TLSClientConfig: tlsConfig,
 	}
+
+	for _, opt := range opts {
+		opt.apply(c)
+		opt.applyQueue(c.Queue)
+	}
+
 	go c.Run()
 	return c
 }
@@ -81,7 +76,7 @@ func (c *Clickhouse) AddServer(url string, logQueries bool) {
 	defer c.mu.Unlock()
 	c.Servers = append(c.Servers, &ClickhouseServer{URL: url, Client: &http.Client{
 		Timeout: time.Second * time.Duration(c.ConnectTimeout), Transport: c.Transport,
-	}, LogQueries: logQueries })
+	}, LogQueries: logQueries})
 }
 
 // DumpServers - dump servers state to prometheus
@@ -181,6 +176,10 @@ func (c *Clickhouse) Run() {
 	}
 }
 
+func (c *Clickhouse) Stop() {
+	c.Queue.Stop()
+}
+
 // WaitFlush - wait for flush ends
 func (c *Clickhouse) WaitFlush() (err error) {
 	c.wg.Wait()
@@ -194,7 +193,7 @@ func (srv *ClickhouseServer) SendQuery(r *ClickhouseRequest) (response string, s
 		if r.Params != "" {
 			url += "?" + r.Params
 		}
-		if r.isInsert && srv.LogQueries {
+		if r.IsInsert && srv.LogQueries {
 			log.Printf("INFO: sending %+v rows to %+v of %+v\n", r.Count, srv.URL, r.Query)
 		}
 		resp, err := srv.Client.Post(url, "text/plain", strings.NewReader(r.Content))
@@ -202,7 +201,7 @@ func (srv *ClickhouseServer) SendQuery(r *ClickhouseRequest) (response string, s
 			srv.Bad = true
 			return err.Error(), http.StatusBadGateway, ErrServerIsDown
 		}
-		if r.isInsert && srv.LogQueries {
+		if r.IsInsert && srv.LogQueries {
 			log.Printf("INFO: sent %+v rows to %+v of %+v\n", r.Count, srv.URL, r.Query)
 		}
 		buf, _ := ioutil.ReadAll(resp.Body)

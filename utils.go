@@ -18,6 +18,13 @@ type clickhouseConfig struct {
 	ConnectTimeout int      `json:"connect_timeout"`
 }
 
+type nsqConfig struct {
+	NsqlookupdAddresses []string `json:"nsqlookupd_addresses"`
+	NsqdAddresses       []string `json:"nsqd_addresses"`
+	Topic               string   `json:"topic"`
+	Channel             string   `json:"channel"`
+}
+
 // Config stores config data
 type Config struct {
 	Listen            string           `json:"listen"`
@@ -29,11 +36,12 @@ type Config struct {
 	DumpCheckInterval int              `json:"dump_check_interval"`
 	DumpDir           string           `json:"dump_dir"`
 	Debug             bool             `json:"debug"`
-	LogQueries		    bool             `json:"log_queries"`
+	LogQueries        bool             `json:"log_queries"`
 	MetricsPrefix     string           `json:"metrics_prefix"`
 	UseTLS            bool             `json:"use_tls"`
-	TLSCertFile				string           `json:"tls_cert_file"`
-	TLSKeyFile				string           `json:"tls_key_file"`
+	TLSCertFile       string           `json:"tls_cert_file"`
+	TLSKeyFile        string           `json:"tls_key_file"`
+	Nsq               nsqConfig        `json:"nsq"`
 }
 
 // ReadJSON - read json file to struct

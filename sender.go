@@ -12,6 +12,7 @@ type Sender interface {
 	SendQuery(r *ClickhouseRequest) (response string, status int, err error)
 	Len() int64
 	Empty() bool
+	Stop()
 	WaitFlush() (err error)
 }
 
@@ -43,4 +44,8 @@ func (s *fakeSender) Empty() bool {
 
 func (s *fakeSender) WaitFlush() error {
 	return nil
+}
+
+func (s *fakeSender) Stop() {
+
 }

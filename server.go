@@ -67,7 +67,7 @@ func (server *Server) writeHandler(c echo.Context) error {
 		go server.Collector.Push(params, content)
 		return c.String(http.StatusOK, "")
 	}
-	resp, status, _ := server.Collector.Sender.SendQuery(&ClickhouseRequest{Params: qs, Content: s, isInsert: false})
+	resp, status, _ := server.Collector.Sender.SendQuery(&ClickhouseRequest{Params: qs, Content: s, IsInsert: false})
 	return c.String(status, resp)
 }
 
@@ -130,6 +130,7 @@ func InitServer(listen string, collector *Collector, debug bool, logQueries bool
 
 // SafeQuit - safe prepare to quit
 func SafeQuit(collect *Collector, sender Sender) {
+	sender.Stop()
 	collect.FlushAll()
 	if count := sender.Len(); count > 0 {
 		log.Printf("Sending %+v tables\n", count)
@@ -144,7 +145,11 @@ func SafeQuit(collect *Collector, sender Sender) {
 func RunServer(cnf Config) {
 	InitMetrics(cnf.MetricsPrefix)
 	dumper := NewDumper(cnf.DumpDir)
-	sender := NewClickhouse(cnf.Clickhouse.DownTimeout, cnf.Clickhouse.ConnectTimeout, cnf.Clickhouse.tlsServerName, cnf.Clickhouse.tlsSkipVerify)
+	sender := NewClickhouse(cnf.Clickhouse.DownTimeout, cnf.Clickhouse.ConnectTimeout, cnf.Clickhouse.tlsServerName, cnf.Clickhouse.tlsSkipVerify,
+		WithTopic(cnf.Nsq.Topic),
+		WithChannel(cnf.Nsq.Channel),
+		WithNsqdAddresses(cnf.Nsq.NsqdAddresses),
+		WithNsqlookupAddresses(cnf.Nsq.NsqlookupdAddresses))
 	sender.Dumper = dumper
 	for _, url := range cnf.Clickhouse.Servers {
 		sender.AddServer(url, cnf.LogQueries)
