@@ -144,12 +144,12 @@ func SafeQuit(collect *Collector, sender Sender) {
 // RunServer - run all
 func RunServer(cnf Config) {
 	InitMetrics(cnf.MetricsPrefix)
-	dumper := NewDumper(cnf.DumpDir)
+	dumper := NewDumper(cnf.DumpDir, cnf.hostname)
 	sender := NewClickhouse(cnf.Clickhouse.DownTimeout, cnf.Clickhouse.ConnectTimeout, cnf.Clickhouse.tlsServerName, cnf.Clickhouse.tlsSkipVerify,
 		WithTopic(cnf.Nsq.Topic),
 		WithChannel(cnf.Nsq.Channel),
 		WithNsqdAddresses(cnf.Nsq.NsqdAddresses),
-		WithNsqlookupAddresses(cnf.Nsq.NsqlookupdAddresses))
+		WithNsqlookupdAddresses(cnf.Nsq.NsqlookupdAddresses))
 	sender.Dumper = dumper
 	for _, url := range cnf.Clickhouse.Servers {
 		sender.AddServer(url, cnf.LogQueries)

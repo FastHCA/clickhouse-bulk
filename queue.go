@@ -12,15 +12,16 @@ import (
 )
 
 const (
-	MaxInFlight = 32
+	MaxInFlight = 8
 )
 
 var (
-	ReservedLocalQueueSize = MaxInFlight*runtime.NumCPU()*2 + MaxInFlight
+	ReservedLocalQueueSize = MaxInFlight*runtime.NumCPU()*2 + runtime.NumCPU()*2
 )
 
 type Queue struct {
 	local               *queue.Queue
+	localQueueCapacity  int64
 	consumer            *nsq.Consumer
 	producers           []*nsq.Producer
 	nsqConfig           *nsq.Config
@@ -33,35 +34,15 @@ type Queue struct {
 	currentProducer int32
 }
 
-func NewQueue(hint int64) *Queue {
+func NewQueue(capacity int64) *Queue {
 	nsqConfig := nsq.NewConfig()
 	nsqConfig.MaxInFlight = 0
 	nsqConfig.MaxAttempts = 32
 
 	instance := &Queue{
-		local:     queue.New(hint),
-		nsqConfig: nsqConfig,
-	}
-
-	{
-		consumer, err := nsq.NewConsumer(instance.topic, instance.channel, instance.nsqConfig)
-		if err != nil {
-			panic(err)
-		}
-		consumer.AddConcurrentHandlers(nsq.HandlerFunc(instance.handleNsqMessage), runtime.NumCPU()*2)
-		err = consumer.ConnectToNSQLookupds(instance.nsqlookupdAddresses)
-		if err != nil {
-			panic(err)
-		}
-		instance.consumer = consumer
-	}
-
-	for _, addr := range instance.nsqdAddresses {
-		procuder, err := nsq.NewProducer(addr, instance.nsqConfig)
-		if err != nil {
-			panic(err)
-		}
-		instance.producers = append(instance.producers, procuder)
+		local:              queue.New(capacity),
+		localQueueCapacity: capacity,
+		nsqConfig:          nsqConfig,
 	}
 
 	return instance
@@ -81,12 +62,11 @@ func (q *Queue) Len() int64 {
 func (q *Queue) Poll(count int64, timeout time.Duration) ([]interface{}, error) {
 	data, err := q.local.Poll(count, timeout)
 	if err != nil {
-		return nil, err
+		if q.local.Len() == 0 {
+			q.consumer.ChangeMaxInFlight(MaxInFlight)
+		}
 	}
-	if len(data) == 0 {
-		q.consumer.ChangeMaxInFlight(MaxInFlight)
-	}
-	return data, nil
+	return data, err
 }
 
 // Put implements Queue.
@@ -110,6 +90,35 @@ func (q *Queue) Put(items ...*ClickhouseRequest) error {
 
 func (q *Queue) Stop() {
 	q.consumer.Stop()
+}
+
+func (q *Queue) init() {
+	consumer, err := nsq.NewConsumer(q.topic, q.channel, q.nsqConfig)
+	if err != nil {
+		panic(err)
+	}
+	consumer.AddConcurrentHandlers(nsq.HandlerFunc(q.handleNsqMessage), runtime.NumCPU())
+	if len(q.nsqlookupdAddresses) > 0 {
+		err = consumer.ConnectToNSQLookupds(q.nsqlookupdAddresses)
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		err = consumer.ConnectToNSQDs(q.nsqdAddresses)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	q.consumer = consumer
+
+	for _, addr := range q.nsqdAddresses {
+		producer, err := nsq.NewProducer(addr, q.nsqConfig)
+		if err != nil {
+			panic(err)
+		}
+		q.producers = append(q.producers, producer)
+	}
 }
 
 func (q *Queue) sendToNsq(topic string, body []byte) error {
@@ -155,18 +164,18 @@ func (q *Queue) nextProducer() int32 {
 }
 
 func (q *Queue) handleNsqMessage(message *nsq.Message) error {
-	if q.local.Len() < int64(ReservedLocalQueueSize) {
+	if (q.localQueueCapacity - q.local.Len()) < int64(ReservedLocalQueueSize) {
 		q.consumer.ChangeMaxInFlight(0)
 	}
 
-	var req *ClickhouseRequest
+	var req ClickhouseRequest
 	{
 		reader := bytes.NewBuffer(message.Body)
-		err := msgp.Decode(reader, req)
+		err := msgp.Decode(reader, &req)
 		if err != nil {
 			return err
 		}
 	}
 
-	return q.local.Put(req)
+	return q.local.Put(&req)
 }

@@ -32,6 +32,7 @@ type FileDumper struct {
 	DumpPrefix  string
 	DumpNum     int
 	LockedFiles map[string]bool
+	hostname    string
 	mu          sync.Mutex
 }
 
@@ -50,14 +51,15 @@ func (d *FileDumper) checkDir(create bool) error {
 }
 
 func (d *FileDumper) dumpName(num int, prefix string, status int) string {
-	return "dump" + d.DumpPrefix + prefix + "-" + strconv.Itoa(num) + "-" + strconv.Itoa(status) + ".dmp"
+	return "dump" + d.DumpPrefix + prefix + "-" + d.hostname + "-" + strconv.Itoa(num) + "-" + strconv.Itoa(status) + ".dmp"
 }
 
 // NewDumper - create new dumper
-func NewDumper(path string) *FileDumper {
+func NewDumper(path string, hostname string) *FileDumper {
 	d := new(FileDumper)
 	d.Path = path
-	d.DumpPrefix = time.Now().Format("20060102150405")
+	d.DumpPrefix = strings.ReplaceAll(time.Now().Format("20060102150405.000"), ".", "")
+	d.hostname = hostname
 	return d
 }
 

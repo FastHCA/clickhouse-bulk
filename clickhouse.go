@@ -66,6 +66,8 @@ func NewClickhouse(downTimeout int, connectTimeout int, tlsServerName string, tl
 		opt.applyQueue(c.Queue)
 	}
 
+	c.Queue.init()
+
 	go c.Run()
 	return c
 }

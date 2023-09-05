@@ -72,6 +72,19 @@ INSERT INTO table3 (c1, c2, c3) VALUES ('v1', 'v2', 'v3')('v4', 'v5', 'v6')
       "http://127.0.0.1:8123"
     ]
   },
+  "use_tls": false,
+  "tls_cert_file": "",
+  "tls_key_file": "",
+  "nsq": {
+    "nsqlookupd_addresses": [
+        "127.0.0.1:4161"
+    ],
+    "nsqd_addresses": [
+        "127.0.0.1:4150"
+    ],
+    "topic": "",
+    "channel": ""
+  },
   "metrics_prefix": "prefix"
 }
 ```
@@ -88,6 +101,10 @@ INSERT INTO table3 (c1, c2, c3) VALUES ('v1', 'v2', 'v3')('v4', 'v5', 'v6')
 * `CLICKHOUSE_CONNECT_TIMEOUT` - clickhouse server connect timeout
 * `CLICKHOUSE_TLS_SERVER_NAME` - server name for TLS certificate verification
 * `CLICKHOUSE_INSECURE_TLS_SKIP_VERIFY` - skip certificate verification at all
+* `NSQ_NSQLOOKUPD_ADDRESSES` - comma separated list of nsqlookupd address
+* `NSQ_NSQD_ADDRESSES` - comma separated list of nsqd address
+* `NSQ_TOPIC` - specified topic
+* `NSQ_CHANNEL` - specified channel
 * `METRICS_PREFIX` - prefix for prometheus metrics
 
 ### Quickstart

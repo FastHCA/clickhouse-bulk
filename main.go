@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"flag"
 	"log"
 	"os"
@@ -27,5 +28,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("ERROR: %+v\n", err)
 	}
+
+	ip, err := LocalIP()
+	cnf.hostname = hex.EncodeToString(ip.To4())
+
 	RunServer(cnf)
 }

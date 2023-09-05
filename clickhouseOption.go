@@ -17,7 +17,7 @@ func (fn ClickhouseQueueOptionFunc) applyQueue(q *Queue) {
 	fn(q)
 }
 
-func WithNsqlookupAddresses(addresses []string) ClickhouseOption {
+func WithNsqlookupdAddresses(addresses []string) ClickhouseOption {
 	return ClickhouseQueueOptionFunc(func(q *Queue) {
 		q.nsqlookupdAddresses = addresses
 	})
