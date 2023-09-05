@@ -12,7 +12,7 @@ import (
 func TestDump_Dump(t *testing.T) {
 	c := NewClickhouse(-1, 10, "", false)
 	dumpDir := "dumptest"
-	dumper := NewDumper(dumpDir)
+	dumper := NewDumper(dumpDir, "test")
 	c.Dumper = dumper
 	c.AddServer("", true)
 	c.Dump("eee", "eee", "error", "", 502)
