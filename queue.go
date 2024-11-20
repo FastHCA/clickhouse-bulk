@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -32,6 +33,8 @@ type Queue struct {
 	channel string
 
 	currentProducer int32
+
+	wg sync.WaitGroup
 }
 
 func NewQueue(capacity int64) *Queue {
@@ -69,6 +72,14 @@ func (q *Queue) Poll(count int64, timeout time.Duration) ([]interface{}, error) 
 	return data, err
 }
 
+func (q *Queue) Ack(n uint64) {
+	var count int = int(n)
+
+	for i := 0; i < count; i++ {
+		q.wg.Done()
+	}
+}
+
 // Put implements Queue.
 func (q *Queue) Put(items ...*ClickhouseRequest) error {
 	for _, r := range items {
@@ -82,6 +93,10 @@ func (q *Queue) Put(items ...*ClickhouseRequest) error {
 		}
 		err = q.sendToNsq(q.topic, body)
 		if err != nil {
+			q.wg.Add(1)
+			if err := q.local.Put(r); err != nil {
+				q.wg.Done()
+			}
 			return err
 		}
 	}
@@ -89,6 +104,7 @@ func (q *Queue) Put(items ...*ClickhouseRequest) error {
 }
 
 func (q *Queue) Stop() {
+	q.wg.Wait()
 	q.consumer.Stop()
 }
 
@@ -177,5 +193,10 @@ func (q *Queue) handleNsqMessage(message *nsq.Message) error {
 		}
 	}
 
-	return q.local.Put(&req)
+	q.wg.Add(1)
+	if err := q.local.Put(&req); err != nil {
+		q.wg.Done()
+		return err
+	}
+	return nil
 }

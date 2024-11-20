@@ -128,6 +128,8 @@ func (c *Clickhouse) GetNextServer() (srv *ClickhouseServer) {
 
 // Send - send request to next server
 func (c *Clickhouse) Send(r *ClickhouseRequest) {
+	defer c.wg.Done()
+
 	c.wg.Add(1)
 	c.Queue.Put(r)
 }
@@ -160,6 +162,7 @@ func (c *Clickhouse) Run() {
 	for {
 		datas, err = c.Queue.Poll(1, time.Second*5)
 		if err == nil {
+			c.wg.Add(1)
 			data := datas[0].(*ClickhouseRequest)
 			resp, status, err := c.SendQuery(data)
 			if err != nil {
@@ -173,6 +176,7 @@ func (c *Clickhouse) Run() {
 				sentCounter.Inc()
 			}
 			c.DumpServers()
+			c.Queue.Ack(1)
 			c.wg.Done()
 		}
 	}
